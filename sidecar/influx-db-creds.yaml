@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: influx-db-cred
+data:
+  INFLUX_HOST:
+  INFLUX_PORT:
+  INFLUX_DB:
+  INFLUX_TOKEN:
+  INFLUX_BUCKET:
+  INFLUX_ORG:

@@ -1,0 +1,68 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: busybox
+spec:
+  volumes:
+  - name: fluent-bit-config-template
+    configMap:
+      name: fluent-bit-config-template
+      defaultMode: 0777
+  - name: app-log
+    hostPath:
+      path: /var/log/pods
+      type: Directory
+  - name: fluent-bit-config
+    emptyDir: {}
+  containers:
+  - name: &container1 busybox
+    image: busybox:latest
+    command: ["/bin/sh"]
+    volumeMounts:
+      - mountPath: /conf/fluent-bit.conf
+        name: fluent-bit-config
+        subPath: fluent-bit.conf
+      - mountPath: /var/log/pods
+        name: app-log
+    args:
+    - -c
+    - for run in $(seq 1 100); do date; sleep 5; done
+  - name: fluent
+    image: fluent/fluent-bit:1.8
+    volumeMounts:
+      - mountPath: /fluent-bit/etc/fluent-bit.conf
+        name: fluent-bit-config
+        subPath: fluent-bit.conf
+      - mountPath: /var/log/pods
+        name: app-log
+  initContainers:
+  - name: fluent-bit-config-manager
+    image: busybox:latest
+    volumeMounts:
+      - mountPath: /fluent-bit-template.conf
+        name: fluent-bit-config-template
+        subPath: fluent-bit-template.conf
+      - mountPath: /conf
+        name: fluent-bit-config
+    envFrom:
+    - secretRef:
+        name: influx-db-cred
+    env:
+    - name: POD_ID
+      valueFrom:
+        fieldRef:
+          fieldPath: metadata.uid
+    - name: POD_NAME
+      valueFrom:
+        fieldRef:
+          fieldPath: metadata.name
+    - name: NAMESPACE
+      valueFrom:
+        fieldRef:
+          fieldPath: metadata.namespace
+    - name: CONTAINER_NAME
+      value: *container1
+    command: ["/bin/sh"]
+    args:
+    - -c
+    - eval "echo \"$(cat /fluent-bit-template.conf)\"" > /conf/fluent-bit.conf
